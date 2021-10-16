@@ -1,20 +1,22 @@
-package main
+package command
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/honeycombio/honeymarker/pkg/client"
+	"github.com/honeycombio/honeymarker/pkg/marker"
 )
 
-type ListCommand struct {
-	JSON           bool `long:"json" description:"Output the list as json instead of in tabular form."`
-	UnixTimestamps bool `long:"unix_time" description:"In table mode, format times as unit timestamps (seconds since the epoch)"`
+func NewListCommand(json bool, ts bool, httpClient client.HoneyCombClient) *ListCommand {
+	return &ListCommand{
+		JSON:           json,
+		UnixTimestamps: ts,
+		httpClient:     httpClient,
+	}
 }
 
 const (
@@ -49,32 +51,24 @@ func (l *ListCommand) formatTime(timestamp int64) string {
 	return t.Format(time.Stamp)
 }
 
-func (l *ListCommand) Execute(args []string) error {
-	postURL, err := url.Parse(options.APIHost)
-	if err != nil {
-		errMsg := fmt.Sprintf("Failed to parse URL %s", options.APIHost)
-		return errors.New(errMsg)
-	}
-	postURL.Path = "/1/markers/" + options.Dataset
-	req, err := http.NewRequest("GET", postURL.String(), nil)
-	req.Header.Set("User-Agent", UserAgent)
-	req.Header.Add("X-Honeycomb-Team", options.WriteKey)
-	req.Header.Add("X-Honeycomb-Dataset", options.Dataset)
-	if options.AuthorizationHeader != "" {
-		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", options.AuthorizationHeader))
-	}
-	resp, err := client.Do(req)
+func (l *ListCommand) Execute() error {
+	req, err := l.httpClient.NewRequest("GET", nil)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+
+	// if l.AuthorizationHeader != "" {
+	// 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", l.AuthorizationHeader))
+	// }
+
+	resp, err := client.MakeRequest(req)
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
-		errMsg := fmt.Sprintf("Failed with %d and message: %s", resp.StatusCode, body)
-		return errors.New(errMsg)
+
+	body, err := client.ReadResponse(resp)
+	if err != nil {
+		return err
 	}
 
 	if l.JSON {
@@ -94,7 +88,7 @@ func (l *ListCommand) ListAsJSON(body []byte) error {
 
 func (l *ListCommand) ListAsTable(body []byte) error {
 	// Unmarshal string into structs.
-	var mkrs []marker
+	var mkrs []marker.Marker
 	if err := json.Unmarshal(body, &mkrs); err != nil {
 		return err
 	}
