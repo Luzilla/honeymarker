@@ -42,12 +42,14 @@ func main() {
 			&cli.StringFlag{
 				Name:     "writekey",
 				Aliases:  []string{"k"},
+				EnvVars:  []string{"HONEYCOMB_API_KEY"},
 				Usage:    "Honeycomb write key from https://ui.honeycomb.io/account",
 				Required: true,
 			},
 			&cli.StringFlag{
 				Name:     "dataset",
 				Aliases:  []string{"d"},
+				EnvVars:  []string{"HONEYCOMB_DATASET"},
 				Usage:    "Honeycomb dataset name from https://ui.honeycomb.io/dashboard",
 				Required: true,
 			},
